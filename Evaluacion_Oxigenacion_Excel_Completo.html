@@ -1,0 +1,146 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Evaluación de Oxigenación Tisular - msanti20@ucm.es</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 2rem; }
+    h1 { color: #0066cc; margin-bottom: 0; }
+    p.copyright { font-size: 0.9rem; color: #666; margin-top: 0.3rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: center; }
+    th { background-color: #f0f0f0; }
+    .ok { background-color: #c6efce; }
+    .alert { background-color: #ffc7ce; }
+    .warning { background-color: #ffeb9c; }
+    form input { width: 6rem; }
+    form { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Evaluación de Oxigenación Tisular - msanti20@ucm.es</h1>
+  <p class="copyright">© msanti20@ucm.es</p>
+
+  <form id="formulario">
+    <label>Hb <input type="number" step="0.1" id="hb"></label>
+    <label>SaO₂ <input type="number" step="0.1" id="sao2"></label>
+    <label>PaO₂ <input type="number" step="0.1" id="pao2"></label>
+    <label>PaCO₂ <input type="number" step="0.1" id="paco2"></label>
+    <label>SvO₂ <input type="number" step="0.1" id="svo2"></label>
+    <label>PvO₂ <input type="number" step="0.1" id="pvo2"></label>
+    <label>PvCO₂ <input type="number" step="0.1" id="pvco2"></label>
+    <button type="button" onclick="calcular()">Añadir paciente</button>
+    <button type="button" onclick="descargarExcel()">Descargar Excel</button>
+  </form>
+
+  <table id="tablaPacientes">
+    <thead>
+      <tr>
+        <th>Paciente</th>
+        <th>CaO₂</th>
+        <th>CvO₂</th>
+        <th>Ca-vO₂</th>
+        <th>ΔpCO₂</th>
+        <th>VCO₂/VO₂</th>
+        <th>IEO₂ (%)</th>
+        <th>Interpretación</th>
+        <th>Hb</th><th>SaO₂</th><th>PaO₂</th><th>PaCO₂</th><th>SvO₂</th><th>PvO₂</th><th>PvCO₂</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    let contador = 1;
+    const datos = [];
+
+    function calcular() {
+      const hb = parseFloat(document.getElementById("hb").value);
+      const sao2 = parseFloat(document.getElementById("sao2").value) / 100;
+      const pao2 = parseFloat(document.getElementById("pao2").value);
+      const paco2 = parseFloat(document.getElementById("paco2").value);
+      const svo2 = parseFloat(document.getElementById("svo2").value) / 100;
+      const pvo2 = parseFloat(document.getElementById("pvo2").value);
+      const pvco2 = parseFloat(document.getElementById("pvco2").value);
+
+      const cao2 = (1.34 * hb * sao2) + (0.0031 * pao2);
+      const cvo2 = (1.34 * hb * svo2) + (0.0031 * pvo2);
+      const cav = cao2 - cvo2;
+      const dpco2 = pvco2 - paco2;
+      const cociente = dpco2 / cav;
+      const ieo2 = (cav / cao2) * 100;
+
+      let dpco2Class = dpco2 > 6 ? "alert" : "ok";
+      let cocienteClass = cociente > 1.4 ? "alert" : "ok";
+      let ieo2Class = "";
+      let interpretacion = "";
+
+      const hipoperfusion = dpco2 > 6 && cociente > 1.4;
+      const bajoGasto = ieo2 > 30;
+
+      if (ieo2 > 35) {
+        ieo2Class = "alert";
+      } else if (ieo2 > 30) {
+        ieo2Class = "warning";
+      }
+
+      if (hipoperfusion && bajoGasto) {
+        interpretacion = "Revisa los datos: ΔpCO₂ y VCO₂/VO₂ alterados → hipoperfusión probable; IEO₂ elevado → posible bajo gasto";
+      } else if (hipoperfusion) {
+        interpretacion = "Revisa los datos: ΔpCO₂ y VCO₂/VO₂ alterados → hipoperfusión probable";
+      } else if (bajoGasto) {
+        interpretacion = "IEO₂ elevado → posible bajo gasto";
+      }
+
+      datos.push({
+        "Paciente": "Paciente " + contador,
+        "CaO₂": cao2.toFixed(2),
+        "CvO₂": cvo2.toFixed(2),
+        "Ca-vO₂": cav.toFixed(2),
+        "ΔpCO₂": dpco2.toFixed(2),
+        "VCO₂/VO₂": cociente.toFixed(2),
+        "IEO₂ (%)": ieo2.toFixed(1),
+        "Interpretación": interpretacion,
+        "Hb": hb,
+        "SaO₂": sao2 * 100,
+        "PaO₂": pao2,
+        "PaCO₂": paco2,
+        "SvO₂": svo2 * 100,
+        "PvO₂": pvo2,
+        "PvCO₂": pvco2
+      });
+
+      const fila = document.getElementById("tablaPacientes").getElementsByTagName("tbody")[0].insertRow();
+      fila.innerHTML = `
+        <td>Paciente ${contador++}</td>
+        <td>${cao2.toFixed(2)}</td>
+        <td>${cvo2.toFixed(2)}</td>
+        <td>${cav.toFixed(2)}</td>
+        <td class="${dpco2Class}">${dpco2.toFixed(2)}</td>
+        <td class="${cocienteClass}">${cociente.toFixed(2)}</td>
+        <td class="${ieo2Class}">${ieo2.toFixed(1)}</td>
+        <td class="${ieo2Class}">${interpretacion}</td>
+        <td>${hb}</td><td>${sao2*100}</td><td>${pao2}</td><td>${paco2}</td><td>${svo2*100}</td><td>${pvo2}</td><td>${pvco2}</td>
+      `;
+
+      document.getElementById("hb").value = "";
+      document.getElementById("sao2").value = "";
+      document.getElementById("pao2").value = "";
+      document.getElementById("paco2").value = "";
+      document.getElementById("svo2").value = "";
+      document.getElementById("pvo2").value = "";
+      document.getElementById("pvco2").value = "";
+    }
+
+    function descargarExcel() {
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(datos);
+      XLSX.utils.book_append_sheet(wb, ws, "Oxigenación Tisular");
+      XLSX.writeFile(wb, "Evaluacion_Oxigenacion.xlsx");
+    }
+  </script>
+</body>
+</html>
